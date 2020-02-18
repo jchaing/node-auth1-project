@@ -4,14 +4,12 @@ const Users = require('./users-model.js');
 
 const { validateAuth } = require('../middleware/auth-middleware.js');
 
-/*** /api/users/register ***/
+/*** /api/register ***/
 
 router.post('/register', (req, res) => {
   let user = req.body;
-  console.log('User', user);
 
   const hash = bcrypt.hashSync(user.password, 12);
-  console.log('Hash', hash);
   user.password = hash;
 
   Users.add(user)
@@ -24,7 +22,7 @@ router.post('/register', (req, res) => {
     });
 });
 
-/*** /api/users/login ***/
+/*** /api/login ***/
 
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
@@ -32,19 +30,27 @@ router.post('/login', (req, res) => {
   Users.findBy({ username })
     .first()
     .then(user => {
-      console.log('user', user);
-      user && bcrypt.compareSync(password, user.password)
-        ? res.status(200).json({ message: `Welcome ${user.username}!` })
-        : res.status(401).json({ message: 'Invalid Credentials' });
+      if (user && bcrypt.compareSync(password, user.password)) {
+        req.session.loggedin = true;
+        req.session.skippy = 'peanutbutter';
+
+        console.log('Login session', req.session);
+
+        res.status(200).json({ message: `Welcome ${user.username}!` });
+      } else {
+        res.status(401).json({ message: 'Invalid Credentials' });
+      }
     })
     .catch(err => {
       res.status(500).json({ error: 'Unable to login', err });
     });
 });
 
-/*** /api/users/login ***/
+/*** /api/users/ ***/
 
 router.get('/users', validateAuth, (req, res) => {
+  req.session.skippy = 'jelly';
+  console.log('Users session', req.session);
   Users.find()
     .then(users => {
       res.status(200).json(users);
@@ -54,23 +60,23 @@ router.get('/users', validateAuth, (req, res) => {
     });
 });
 
-// middleware login authentication
+/*** /api/logout ***/
 
-// function validateAuth(req, res, next) {
-//   const { username, password } = req.headers;
-
-//   username && password
-//     ? Users.findBy({ username })
-//         .first()
-//         .then(user => {
-//           user && bcrypt.compareSync(password, user.password)
-//             ? next()
-//             : res.status(401).json({ message: 'Invalid Credentials' });
-//         })
-//         .catch(err => {
-//           res.status(500).json({ error: 'Failed to authenticate', err });
-//         })
-//     : res.status(400).json({ message: 'No credentials provided' });
-// }
+router.get('/logout', (req, res) => {
+  if (req.session) {
+    req.session.destroy(err => {
+      if (err) {
+        res.json({
+          message: 'you can checkout antime you like, but can never leave'
+        });
+      } else {
+        res.status(200).json({ message: 'bye, thanks for playing' });
+      }
+    });
+  } else {
+    // res.end();
+    res.status(200).json({ message: 'You were never here to begin with' });
+  }
+});
 
 module.exports = router;
